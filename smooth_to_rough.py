@@ -31,4 +31,4 @@ try:
 
 except IOError as e:
     input()
-    print(f'Error: Could not open {image_path}, {e}')
+    print(f'Error: Could not open {smooth_path}, {e}')
