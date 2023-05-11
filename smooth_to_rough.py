@@ -30,5 +30,5 @@ try:
         print(f'{smooth_path} converted to {rough_path}')
 
 except IOError as e:
-    input()
     print(f'Error: Could not open {smooth_path}, {e}')
+    input()
