@@ -58,15 +58,17 @@ using (var resource = new Resource())
     // Write a copy of the vtex_c up to the DATA block region
     nonDataSize = (int)resource.DataBlock.Offset;
 
-    resource.Reader.BaseStream.Position = 6;
+    resource.Reader.BaseStream.Seek(8, SeekOrigin.Begin);
     var blockOffset = resource.Reader.ReadUInt32();
     var blockCount = resource.Reader.ReadUInt32();
-    resource.Reader.BaseStream.Position += blockOffset - 8; // 8 is 2 uint32s we just read
+    resource.Reader.BaseStream.Seek(blockOffset - 8, SeekOrigin.Current); // 8 is 2 uint32s we just read
     for (var i = 0; i < blockCount; i++)
     {
-        if (resource.Reader.ReadBytes(4) == Encoding.UTF8.GetBytes("DATA"))
+        var blockType = Encoding.UTF8.GetString(resource.Reader.ReadBytes(4));
+        resource.Reader.BaseStream.Position += 8; // Offset, size
+        if (blockType == "DATA")
         {
-            offsetOfDataSize = (int)resource.Reader.BaseStream.Position + 4;
+            offsetOfDataSize = (int)resource.Reader.BaseStream.Position - 4;
             break;
         }
     }
@@ -84,7 +86,7 @@ writer.Write(vtex.Reflectivity[2]);
 writer.Write(vtex.Reflectivity[3]);
 writer.Write((ushort)dds.Width);
 writer.Write((ushort)dds.Height);
-writer.Write((ushort)dds.Height + 1);
+writer.Write((ushort)1);
 writer.Write((byte)format);
 writer.Write((byte)(dds.MipMaps.Length > 0 ? dds.MipMaps.Length : 1));
 writer.Write((uint)0);
@@ -93,20 +95,25 @@ writer.Write((uint)0);
 writer.Write((uint)0);
 writer.Write((uint)0);
 
+var resourceSize = (uint)stream.Length;
+
 // Dxt data goes here
 writer.Write(dds.Data);
 
-// Fixup the file and DATA block size
+// resource: fixup the full and DATA block size
 var fileSize = (uint)stream.Length;
 var dataSize = (uint)(fileSize - nonDataSize);
 
-// This shit is not overwriting it
 writer.Seek(0, SeekOrigin.Begin);
-writer.Write(fileSize);
+writer.Write(resourceSize);
 
 writer.Seek(offsetOfDataSize, SeekOrigin.Begin);
 writer.Write(dataSize);
-writer.Flush();
-stream.Flush();
+
+/*
+writer.Seek(0, SeekOrigin.Begin);
+var res2 = new Resource();
+res2.Read(writer.BaseStream, false);
+*/
 
 return 0;
