@@ -1,15 +1,23 @@
+using System.Reflection;
 using System.Text;
 using Pfim;
+using Pfim.dds;
 using ValveResourceFormat;
 using ValveResourceFormat.ResourceTypes;
 
-Console.WriteLine("dds2vtex v1.0.0");
+Console.WriteLine("dds2vtex v1.0");
 
 static int PressAnyKeyToContinue(int exitCode = 0)
 {
     Console.WriteLine("Press any key to continue...");
     Console.ReadKey();
     return exitCode;
+}
+
+if (args.Length == 0)
+{
+    Console.Error.WriteLine("\tTo use: dds2vtex <dds file>");
+    return PressAnyKeyToContinue(-1);
 }
 
 // get the dds file from args
@@ -26,20 +34,32 @@ var dds = img as Dds;
 if (dds == null)
 {
     Console.Error.WriteLine($"Error, file is not a DDS, but a {img.GetType()} (format {img.Format}, datalen {img.DataLen})");
-    return PressAnyKeyToContinue(-1);
+    return PressAnyKeyToContinue(-2);
+}
+
+var flags = VTexFlags.NO_LOD;
+var numMipLevels = (byte)1;
+
+if (dds.Header.MipMapCount != 0)
+{
+    Console.Error.WriteLine("Warning, DDS has mipmaps, which may not work correctly.");
+    flags &= ~VTexFlags.NO_LOD;
+    numMipLevels = (byte)dds.Header.MipMapCount;
 }
 
 var format = dds switch
 {
     Dxt1Dds => VTexFormat.DXT1,
     Dxt5Dds => VTexFormat.DXT5,
+    Bc6hDds => VTexFormat.BC6H,
+    Bc7Dds => VTexFormat.BC7,
     _ => VTexFormat.UNKNOWN,
 };
 
 if (format == VTexFormat.UNKNOWN)
 {
     Console.Error.WriteLine($"Error, do not handle DDS with format {dds.GetType()}.");
-    return PressAnyKeyToContinue(-2);
+    return PressAnyKeyToContinue(-3);
 }
 
 // TODO: check blocksize
@@ -52,7 +72,9 @@ var offsetOfDataSize = 0;
 
 using (var resource = new Resource())
 {
-    resource.Read("D:/Users/kristi/Downloads/dxt1_template.vtex_c");
+    var assembly = Assembly.GetExecutingAssembly();
+    using var template = assembly.GetManifestResourceStream("vtex.template");
+    resource.Read(template);
     vtex = (Texture)resource.DataBlock;
 
     // Write a copy of the vtex_c up to the DATA block region
@@ -79,16 +101,16 @@ using (var resource = new Resource())
 
 // Write the VTEX data
 writer.Write(vtex.Version);
-writer.Write((ushort)vtex.Flags);
+writer.Write((ushort)flags);
 writer.Write(vtex.Reflectivity[0]);
 writer.Write(vtex.Reflectivity[1]);
 writer.Write(vtex.Reflectivity[2]);
 writer.Write(vtex.Reflectivity[3]);
 writer.Write((ushort)dds.Width);
 writer.Write((ushort)dds.Height);
-writer.Write((ushort)1);
+writer.Write((ushort)(dds.Header.Depth != 0 ? dds.Header.Depth : 1));
 writer.Write((byte)format);
-writer.Write((byte)(dds.MipMaps.Length > 0 ? dds.MipMaps.Length : 1));
+writer.Write((byte)numMipLevels);
 writer.Write((uint)0);
 
 // Extra data
@@ -96,19 +118,17 @@ writer.Write((uint)0);
 writer.Write((uint)0);
 
 var resourceSize = (uint)stream.Length;
+var resourceDataSize = (uint)(resourceSize - nonDataSize);
 
 // Dxt data goes here
 writer.Write(dds.Data);
 
 // resource: fixup the full and DATA block size
-var fileSize = (uint)stream.Length;
-var dataSize = (uint)(fileSize - nonDataSize);
-
 writer.Seek(0, SeekOrigin.Begin);
 writer.Write(resourceSize);
 
 writer.Seek(offsetOfDataSize, SeekOrigin.Begin);
-writer.Write(dataSize);
+writer.Write(resourceDataSize);
 
 /*
 writer.Seek(0, SeekOrigin.Begin);

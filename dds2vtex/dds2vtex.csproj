@@ -1,8 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <Version>1.0</Version>
     <OutputType>Exe</OutputType>
     <TargetFramework>net7.0</TargetFramework>
+    <PublishTrimmed>true</PublishTrimmed>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -11,5 +16,7 @@
     <PackageReference Include="Pfim" Version="0.11.2" />
     <PackageReference Include="ValveResourceFormat" Version="0.3.2.1621" />
   </ItemGroup>
-
+    <ItemGroup>
+        <EmbeddedResource Include="./dxt1_template.vtex_c" LogicalName="vtex.template"/> 
+    </ItemGroup>
 </Project>
